@@ -65,7 +65,7 @@
     "csv-parse": "^5.5.0",
     "uuid": "^9.0.1",
     "langchain": "0.3.36",
-    "@langchain/core": "0.3.36"
+    "@langchain/core": "0.3.36",
     "vite-plugin-node-polyfills": "^0.22.0"
   },
   "devDependencies": {
