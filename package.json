@@ -60,7 +60,6 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",
     "zod": "^3.25.76",
-
     "openai": "^4.68.2",
     "csv-parse": "^5.5.0",
     "uuid": "^9.0.1",
@@ -68,10 +67,9 @@
     "@langchain/core": "0.3.58",
     "vite-plugin-node-polyfills": "^0.22.0",
     "@xenova/transformers": "^2.6.0",
-    "@vercel/ai": "^1.0.0",
     "localforage": "^1.10.0",
     "papaparse": "^5.4.1",
-    "ai": "^5.0.80",
+    "ai": "^5.0.80"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
