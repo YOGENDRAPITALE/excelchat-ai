@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Upload } from "lucide-react";
 
 interface Message {
   id: string;
@@ -13,22 +13,54 @@ const initialMessages: Message[] = [
   {
     id: "1",
     role: "assistant",
-    content: "👋 Hello! I'm your Excel-powered AI assistant. Upload your Excel file or ask a question about your data. I can help you analyze spreadsheets, answer questions, and find insights!",
+    content:
+      "👋 Hello! I'm your Excel-powered AI assistant. Upload your Excel/CSV file or ask a question about your data. I can help you analyze spreadsheets, answer questions, and find insights!",
   },
-];
-
-const mockResponses = [
-  "Based on your data, I can see that Q3 sales increased by 23% compared to Q2. The top-performing product category was Electronics.",
-  "I've analyzed your spreadsheet. There are 1,247 total records. The average order value is $156.32, with a median of $98.50.",
-  "Looking at the trends in your data, I notice a strong correlation between marketing spend and customer acquisition. Would you like me to break this down further?",
-  "Your Excel file shows 5 sheets with data spanning from January 2023 to December 2024. The most active month was November with 342 transactions.",
-  "I found some interesting patterns! Customer retention rate improved by 15% after implementing the loyalty program in March.",
 ];
 
 export function ChatWidget() {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Handle CSV/Excel upload
+  const handleUpload = async (file: File) => {
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.success
+          ? `✅ File uploaded successfully! ${data.total} rows processed. You can now ask questions about your data.`
+          : "❌ Upload failed. Please try again.",
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 2).toString(),
+          role: "assistant",
+          content: "⚠️ Error uploading file.",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle user question
   const handleSend = async (content: string) => {
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -39,17 +71,34 @@ export function ChatWidget() {
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 1000));
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: content }),
+      });
 
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: "assistant",
-      content: mockResponses[Math.floor(Math.random() * mockResponses.length)],
-    };
+      const data = await res.json();
 
-    setMessages((prev) => [...prev, assistantMessage]);
-    setIsLoading(false);
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.answer || "I couldn't find an answer in your CSV.",
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 2).toString(),
+          role: "assistant",
+          content: "⚠️ Error fetching answer.",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -67,10 +116,26 @@ export function ChatWidget() {
           <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
           <span className="text-xs text-muted-foreground">Online</span>
         </div>
+        {/* Upload Button */}
+        <button
+          className="ml-4 flex items-center gap-1 px-3 py-1 rounded-lg bg-primary text-white text-sm hover:bg-primary/80"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload className="w-4 h-4" /> Upload CSV
+        </button>
+        <input
+          type="file"
+          accept=".csv,.xlsx"
+          className="hidden"
+          ref={fileInputRef}
+          onChange={(e) => {
+            if (e.target.files && e.target.files[0]) handleUpload(e.target.files[0]);
+          }}
+        />
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {messages.map((message) => (
           <ChatMessage key={message.id} role={message.role} content={message.content} />
         ))}
@@ -81,9 +146,18 @@ export function ChatWidget() {
             </div>
             <div className="bg-secondary rounded-2xl rounded-tl-sm px-4 py-3">
               <div className="flex gap-1">
-                <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "300ms" }} />
+                <span
+                  className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce"
+                  style={{ animationDelay: "0ms" }}
+                />
+                <span
+                  className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce"
+                  style={{ animationDelay: "150ms" }}
+                />
+                <span
+                  className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce"
+                  style={{ animationDelay: "300ms" }}
+                />
               </div>
             </div>
           </div>
@@ -91,7 +165,7 @@ export function ChatWidget() {
       </div>
 
       {/* Input */}
-      <ChatInput onSend={handleSend} disabled={isLoading} placeholder="Ask about your Excel data..." />
+      <ChatInput onSend={handleSend} disabled={isLoading} placeholder="Ask about your Excel/CSV data..." />
     </div>
   );
 }
