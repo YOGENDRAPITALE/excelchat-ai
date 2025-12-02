@@ -66,7 +66,12 @@
     "uuid": "^9.0.1",
     "langchain": "0.3.36",
     "@langchain/core": "0.3.58",
-    "vite-plugin-node-polyfills": "^0.22.0"
+    "vite-plugin-node-polyfills": "^0.22.0",
+     "@xenova/transformers": "^2.6.0",
+  "@vercel/ai": "^1.0.0",
+  "localforage": "^1.10.0",
+  "papaparse": "^5.4.1",
+  "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
