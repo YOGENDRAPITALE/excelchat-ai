@@ -78,7 +78,7 @@ export default function About() {
                       JD
                     </div>
                     <div>
-                      <p className="font-semibold text-foreground">Jane Doe</p>
+                      <p className="font-semibold text-foreground">Yogendra Pitale</p>
                       <p className="text-sm text-muted-foreground">Founder & CEO</p>
                     </div>
                   </div>
