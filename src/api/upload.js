@@ -1,46 +1,40 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Papa from "papaparse";
 import { embedText } from "../utils/embeddings.js";
-import { setVectors } from "./chat.js"; // Import chat API setter
+import { kv } from "@vercel/kv";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method === "POST") {
-    try {
-      const file = req.body.file; // file should be sent as base64 or FormData
-      if (!file) return res.status(400).json({ error: "No file uploaded" });
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-      // Parse CSV
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: async function (results) {
-          const rows = results.data;
-          const vectorized: { id: string; text: string; embedding: number[] }[] = [];
+  try {
+    // CSV file should be sent as FormData
+    const file = req.body.file;
+    if (!file) return res.status(400).json({ error: "No file uploaded" });
 
-          for (const row of rows) {
-            const text = JSON.stringify(row);
-            const embedding = await embedText(text);
+    // Parse CSV
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async function (results) {
+        const rows = results.data;
+        const vectorized: { id: string; text: string; embedding: number[] }[] = [];
 
-            vectorized.push({
-              id: crypto.randomUUID(),
-              text,
-              embedding,
-            });
-          }
+        for (const row of rows) {
+          const text = JSON.stringify(row);
+          const embedding = await embedText(text);
+          vectorized.push({ id: crypto.randomUUID(), text, embedding });
+        }
 
-          // Populate chat API in-memory store
-          setVectors(vectorized);
+        // Persist vectors in Vercel KV
+        await kv.set("excelchat-vectors", JSON.stringify(vectorized));
 
-          res.json({ success: true, total: vectorized.length });
-        },
-        error: function (err) {
-          res.status(500).json({ error: err.message });
-        },
-      });
-    } catch (err) {
-      res.status(500).json({ error: "Error processing file" });
-    }
-  } else {
-    res.status(405).json({ error: "Method not allowed" });
+        res.json({ success: true, total: vectorized.length });
+      },
+      error: function (err) {
+        res.status(500).json({ error: err.message });
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Error processing file" });
   }
 }
