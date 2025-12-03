@@ -1,35 +1,22 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { embedText } from "../utils/embeddings.js";
-import { cosineSimilarity } from "../utils/similarity.js";
-import { generateAnswer } from "../utils/gpt.js";
-import { kv } from "@vercel/kv";
+import { queryChat } from "./chat-core.js";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-
+export default async function handler(req, res) {
   try {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Method not allowed" });
+    }
+
     const { question } = req.body;
-    if (!question) return res.status(400).json({ error: "No question provided" });
 
-    // Retrieve vectors from KV
-    const raw = await kv.get("excelchat-vectors");
-    const vectors = raw ? JSON.parse(raw as string) : [];
+    if (!question || question.trim().length === 0) {
+      return res.status(400).json({ error: "Question is required" });
+    }
 
-    if (!vectors.length) return res.json({ answer: "No data found. Please upload a CSV first." });
+    const answer = await queryChat(question);
 
-    const qEmbedding = await embedText(question);
-
-    const scored = vectors
-      .map((record: any) => ({ ...record, score: cosineSimilarity(qEmbedding, record.embedding) }))
-      .sort((a: any, b: any) => b.score - a.score)
-      .slice(0, 8);
-
-    const context = scored.map((s: any) => s.text).join("\n");
-
-    const answer = await generateAnswer(question, context);
-
-    res.json({ answer });
-  } catch (err) {
-    res.status(500).json({ answer: "⚠️ Error fetching answer." });
+    return res.status(200).json({ answer });
+  } catch (error) {
+    console.error("Chat API Error:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 }
