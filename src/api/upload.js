@@ -1,40 +1,41 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Papa from "papaparse";
-import { embedText } from "../utils/embeddings.js";
-import { kv } from "@vercel/kv";
+import localforage from "localforage";
+import { embedText } from "../utils/embeddings";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-
-  try {
-    // CSV file should be sent as FormData
-    const file = req.body.file;
-    if (!file) return res.status(400).json({ error: "No file uploaded" });
-
-    // Parse CSV
+export async function uploadCSV(file) {
+  return new Promise((resolve, reject) => {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: async function (results) {
-        const rows = results.data;
-        const vectorized: { id: string; text: string; embedding: number[] }[] = [];
 
-        for (const row of rows) {
-          const text = JSON.stringify(row);
-          const embedding = await embedText(text);
-          vectorized.push({ id: crypto.randomUUID(), text, embedding });
+      complete: async ({ data }) => {
+        try {
+          const store = localforage.createInstance({ name: "excelchat-vector-db" });
+          const vectorized = [];
+
+          for (const row of data) {
+            const text = JSON.stringify(row);
+            const embedding = await embedText(text);
+
+            vectorized.push({
+              id: crypto.randomUUID(),
+              text,
+              embedding,
+            });
+          }
+
+          await store.setItem("vectors", vectorized);
+
+          resolve({
+            success: true,
+            total: vectorized.length,
+          });
+        } catch (err) {
+          reject(err);
         }
-
-        // Persist vectors in Vercel KV
-        await kv.set("excelchat-vectors", JSON.stringify(vectorized));
-
-        res.json({ success: true, total: vectorized.length });
       },
-      error: function (err) {
-        res.status(500).json({ error: err.message });
-      },
+
+      error: reject,
     });
-  } catch (err) {
-    res.status(500).json({ error: "Error processing file" });
-  }
+  });
 }
