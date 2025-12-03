@@ -1,22 +1,33 @@
-import { queryChat } from "./chat-core.js";
+import localforage from "localforage";
+import { embedText } from "../utils/embeddings";
+import { cosineSimilarity } from "../utils/similarity";
+import { generateAnswer } from "../utils/gpt";
 
-export default async function handler(req, res) {
+export async function queryChat(question) {
   try {
-    if (req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed" });
+    const store = localforage.createInstance({ name: "excelchat-vector-db" });
+    const vectors = (await store.getItem("vectors")) || [];
+
+    if (vectors.length === 0) {
+      return "⚠️ No data available. Please upload a CSV/Excel first.";
     }
 
-    const { question } = req.body;
+    const qEmbedding = await embedText(question);
 
-    if (!question || question.trim().length === 0) {
-      return res.status(400).json({ error: "Question is required" });
-    }
+    const ranked = vectors
+      .map((row) => ({
+        ...row,
+        score: cosineSimilarity(qEmbedding, row.embedding),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8);
 
-    const answer = await queryChat(question);
+    const context = ranked.map((x) => x.text).join("\n");
 
-    return res.status(200).json({ answer });
+    const answer = await generateAnswer(question, context);
+    return answer;
   } catch (error) {
-    console.error("Chat API Error:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    console.error("❌ queryChat error:", error);
+    return "⚠️ Error fetching answer.";
   }
 }
